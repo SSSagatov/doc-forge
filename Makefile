@@ -1,6 +1,8 @@
-.PHONY: test
+.PHONY: test run migrate
 
 test:
-	go run cmd/app/main.go --test-db
+	go test -v -count=1 ./db -run "^TestDB$$"
 run:
 	go run cmd/app/main.go 
+migrate:
+	go run cmd/app/migrator/main.go
