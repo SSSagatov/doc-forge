@@ -1,7 +1,7 @@
 .PHONY: test run migrate
 
 test:
-	go test -v -count=1 ./db -run "^TestDB$$"
+	go test -v -count=1 ./database/postgres -run "^TestDB$$"
 run:
 	go run cmd/app/main.go 
 migrate:

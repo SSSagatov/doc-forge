@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Загрузить документ — doc-forge</title>
+  <style>
+    :root { font-family: Inter, "Segoe UI", sans-serif; color: #172c28; background: #f4f6f2; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header { max-width: 1120px; margin: auto; padding: 28px 32px; display: flex; justify-content: space-between; align-items: center; }
+    .brand { font-size: 23px; font-weight: 750; letter-spacing: -1px; }
+    .brand span { color: #348267; }
+    .badge { color: #527068; font-size: 13px; border: 1px solid #d5e0d8; padding: 7px 12px; border-radius: 30px; }
+    main { max-width: 660px; padding: 64px 24px 40px; margin: auto; text-align: center; }
+    .eyebrow { color: #477668; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+    h1 { font-size: clamp(32px, 6vw, 48px); line-height: 1.12; letter-spacing: -1.8px; margin: 18px 0; }
+    .intro { line-height: 1.7; color: #66766e; max-width: 440px; margin: 0 auto 34px; }
+    .card { background: #fff; padding: 36px; border: 1px solid #dee5de; border-radius: 24px; box-shadow: 0 16px 55px #233d2910; }
+    .upload-area { padding: 30px 20px; background: #fafbf8; border: 1px dashed #b9cdbf; border-radius: 16px; }
+    .icon { width: 60px; height: 70px; margin: 0 auto 20px; display: grid; place-items: center; border: 2px solid #8da798; border-radius: 8px; color: #386a52; font-size: 14px; font-weight: 750; }
+    h2 { font-size: 18px; margin: 0 0 10px; }
+    .hint { color: #748077; font-size: 14px; line-height: 1.6; margin: 0 0 24px; }
+    button { border: 0; border-radius: 10px; padding: 15px 24px; background: #245c46; color: white; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; }
+    button:hover { background: #194833; }
+    button:focus-visible { outline: 3px solid #93c4a8; outline-offset: 4px; }
+    button:disabled { opacity: .65; cursor: wait; }
+    .note { font-size: 13px; line-height: 1.7; color: #7b867f; margin: 22px 0 0; }
+    #filename { overflow-wrap: anywhere; color: #526c5e; font-size: 14px; margin: 18px 0 0; }
+    #status { min-height: 24px; margin: 20px 0 0; line-height: 1.5; font-size: 14px; }
+    #status.error { color: #ae3434; }
+    #status.success { color: #226546; }
+    footer { margin-top: 32px; color: #8a948d; font-size: 12px; }
+    @media (max-width: 480px) { header { padding: 22px; } main { padding-top: 32px; } .card { padding: 20px; } .upload-area { padding: 26px 12px; } }
+  </style>
+</head>
+<body>
+  <header><div class="brand">doc<span>·</span>forge</div><span class="badge">Документы</span></header>
+  <main>
+    <div class="eyebrow">Ваш рабочий стол</div>
+    <h1>Начните с документа</h1>
+    <p class="intro">Выберите PDF на своём компьютере.<br>Мы загрузим его и сообщим, когда всё будет готово.</p>
+    <section class="card" aria-label="Загрузка PDF">
+      <form id="upload-form" action="/doc/pdf/upload" method="post" enctype="multipart/form-data">
+        <div class="upload-area">
+          <div class="icon" aria-hidden="true">PDF</div>
+          <h2>Добавьте свой файл</h2>
+          <p class="hint">Один документ в формате PDF · до 10 МБ</p>
+          <input type="file" id="file" name="file" accept=".pdf,application/pdf" hidden>
+          <button type="button" id="choose">Загрузить PDF файл</button>
+          <p id="filename" hidden></p>
+        </div>
+        <p class="note">Загрузка начнётся сразу после выбора файла.</p>
+        <p id="status" role="status" aria-live="polite"></p>
+      </form>
+      <noscript>Для выбора и загрузки файла включите JavaScript в браузере.</noscript>
+    </section>
+    <footer>doc-forge · Простое начало работы с документами</footer>
+  </main>
+  <script>
+    const input = document.querySelector('#file');
+    const button = document.querySelector('#choose');
+    const status = document.querySelector('#status');
+    const filename = document.querySelector('#filename');
+    button.addEventListener('click', () => input.click());
+    input.addEventListener('change', async () => {
+      const file = input.files[0];
+      if (!file) return;
+      filename.textContent = file.name;
+      filename.hidden = false;
+      status.className = '';
+      if (!file.name.toLowerCase().endsWith('.pdf') || file.size > 10 * 1024 * 1024) {
+        status.textContent = 'Выберите PDF-файл размером до 10 МБ.';
+        status.className = 'error';
+        input.value = '';
+        return;
+      }
+      button.disabled = true;
+      button.textContent = 'Загружаем…';
+      status.textContent = 'Отправляем документ. Пожалуйста, подождите.';
+      const data = new FormData();
+      data.append('file', file);
+      try {
+        const response = await fetch('/doc/pdf/upload', { method: 'POST', body: data });
+        const result = await response.json();
+        status.textContent = result.message;
+        status.className = response.ok ? 'success' : 'error';
+      } catch {
+        status.textContent = 'Не удалось связаться с сервером. Проверьте подключение и попробуйте снова.';
+        status.className = 'error';
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Загрузить PDF файл';
+        input.value = '';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cloud-native-platform/database/postgres"
 	"context"
 	"errors"
 	"flag"
@@ -8,8 +9,6 @@ import (
 	"log"
 	"os"
 	"time"
-
-	"cloud-native-platform/db"
 
 	"github.com/golang-migrate/migrate/v4"
 	pgxmigrate "github.com/golang-migrate/migrate/v4/database/pgx/v5"
@@ -39,7 +38,7 @@ func run(path string) error {
 		return fmt.Errorf("no migrations found in %q: %w", path, err)
 	}
 
-	pool, err := db.Connect(context.Background())
+	pool, err := postgres.Connect(context.Background())
 	if err != nil {
 		return err
 	}

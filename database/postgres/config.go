@@ -1,10 +1,10 @@
-package db
+package postgres
 
 import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
+	"path/filepath"
 
 	"github.com/joho/godotenv"
 )
@@ -20,15 +20,18 @@ type Config struct {
 }
 
 func loadConfig() (Config, error) {
-	if err := godotenv.Load(".env"); err != nil {
-		// Parsing errors may contain secrets from the file.
-		return Config{}, errors.New("failed to load .env: check that the file exists, is readable, and has valid syntax")
+	envPath, err := filepath.Abs("../.env")
+	if err != nil {
+		return Config{}, fmt.Errorf("resolve .env path: %w", err)
 	}
 
-	for _, key := range []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_NAME", "DB_SSLMODE"} {
-		if strings.TrimSpace(os.Getenv(key)) == "" {
-			return Config{}, fmt.Errorf("db: %s is required", key)
-		}
+	if _, err := os.Stat(envPath); err != nil {
+		return Config{}, fmt.Errorf("cannot access .env at %q: %w", envPath, err)
+	}
+
+	if err := godotenv.Load(envPath); err != nil {
+		// Parsing errors may contain secrets from the file.
+		return Config{}, errors.New("failed to load .env: check that the file exists, is readable, and has valid syntax")
 	}
 
 	return Config{
