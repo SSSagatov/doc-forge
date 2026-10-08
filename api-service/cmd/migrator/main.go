@@ -1,7 +1,7 @@
 package main
 
 import (
-	"cloud-native-platform/database/postgres"
+	"cloud-native-platform/api-service/database/postgres"
 	"context"
 	"errors"
 	"flag"

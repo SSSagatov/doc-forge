@@ -20,7 +20,7 @@ type Config struct {
 }
 
 func loadConfig() (Config, error) {
-	envPath, err := filepath.Abs("../.env")
+	envPath, err := filepath.Abs("../../.env")
 	if err != nil {
 		return Config{}, fmt.Errorf("resolve .env path: %w", err)
 	}
