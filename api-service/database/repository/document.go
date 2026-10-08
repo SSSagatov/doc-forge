@@ -43,7 +43,8 @@ func (r *DocumentRepository) Create(ctx context.Context, document *entites.Docum
 		INSERT INTO documents (original_filename, storage_key, mime_type, size_bytes, status)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id::text, original_filename, storage_key, mime_type, size_bytes, status, created_at`,
-		document.OriginalFilename, document.StorageKey, document.MIMEType, document.SizeBytes, string(status)))
+		document.OriginalFilename, document.StorageKey, document.MIMEType, document.SizeBytes, string(status),
+	))
 	if err != nil {
 		return fmt.Errorf("create document: %w", err)
 	}
@@ -69,7 +70,8 @@ func (r *DocumentRepository) List(ctx context.Context, limit, offset int) ([]ent
 	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT id::text, original_filename, storage_key, mime_type, size_bytes, status, created_at
-		FROM documents ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset)
+		FROM documents ORDER BY created_at DESC, id DESC LIMIT $1 OFFSET $2`, limit, offset,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("list documents: %w", err)
 	}
@@ -93,7 +95,10 @@ func (r *DocumentRepository) UpdateStatus(ctx context.Context, id string, status
 	if !validDocumentStatus(status) {
 		return fmt.Errorf("update document status: invalid status %q", status)
 	}
-	result, err := r.pool.Exec(ctx, `UPDATE documents SET status = $2 WHERE id = $1::uuid`, id, string(status))
+	result, err := r.pool.Exec(ctx,
+		`UPDATE documents SET status = $2 WHERE id = $1::uuid`,
+		id, string(status),
+	)
 	if err != nil {
 		return fmt.Errorf("update document status: %w", err)
 	}

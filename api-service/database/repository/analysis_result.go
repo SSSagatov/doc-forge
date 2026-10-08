@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,9 +27,11 @@ func (r *AnalysisResultRepository) Create(ctx context.Context, value *entites.An
 		return fmt.Errorf("create analysis_result: %w", err)
 	}
 	created, err := scanAnalysisResult(r.pool.QueryRow(ctx, `
-INSERT INTO analysis_results (job_id, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at`, value.JobID, value.Summary, value.Requirements, value.Entities, value.Risks, value.RawResponse, value.PromptTokens, value.CompletionTokens))
+	INSERT INTO analysis_results (job_id, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens)
+	VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	RETURNING id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at`,
+		value.JobID, value.Summary, value.Requirements, value.Entities, value.Risks, value.RawResponse, value.PromptTokens, value.CompletionTokens,
+	))
 	if err != nil {
 		return fmt.Errorf("create analysis_result: %w", err)
 	}
@@ -37,7 +40,10 @@ RETURNING id::text, job_id::text, summary, requirements, entities, risks, raw_re
 }
 
 func (r *AnalysisResultRepository) GetByID(ctx context.Context, id string) (*entites.AnalysisResult, error) {
-	value, err := scanAnalysisResult(r.pool.QueryRow(ctx, `SELECT id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at FROM analysis_results WHERE id = $1::uuid`, id))
+	value, err := scanAnalysisResult(r.pool.QueryRow(ctx, `
+	SELECT id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at 
+	FROM analysis_results WHERE id = $1::uuid`, id,
+	))
 	if err != nil {
 		return nil, fmt.Errorf("get analysis_result: %w", err)
 	}
@@ -59,7 +65,9 @@ func (r *AnalysisResultRepository) list(ctx context.Context, parentID *string, l
 	if limit < 1 || limit > 100 || offset < 0 {
 		return nil, errors.New("list analysis_results: limit must be 1..100 and offset must be non-negative")
 	}
-	query := `SELECT id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at FROM analysis_results`
+	query := `
+	SELECT id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at 
+	FROM analysis_results`
 	args := []any{limit, offset}
 	if parentID != nil {
 		query += " WHERE job_id = $3::uuid"
@@ -92,8 +100,12 @@ func (r *AnalysisResultRepository) Update(ctx context.Context, value *entites.An
 		return fmt.Errorf("update analysis_result: %w", err)
 	}
 	updated, err := scanAnalysisResult(r.pool.QueryRow(ctx, `
-UPDATE analysis_results SET job_id = $2, summary = $3, requirements = $4, entities = $5, risks = $6, raw_response = $7, prompt_tokens = $8, completion_tokens = $9
-WHERE id = $1::uuid RETURNING id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at`, value.ID, value.JobID, value.Summary, value.Requirements, value.Entities, value.Risks, value.RawResponse, value.PromptTokens, value.CompletionTokens))
+	UPDATE analysis_results 
+	SET job_id = $2, summary = $3, requirements = $4, entities = $5, risks = $6, raw_response = $7, prompt_tokens = $8, completion_tokens = $9
+	WHERE id = $1::uuid 
+	RETURNING id::text, job_id::text, summary, requirements, entities, risks, raw_response, prompt_tokens, completion_tokens, created_at`,
+		value.ID, value.JobID, value.Summary, value.Requirements, value.Entities, value.Risks, value.RawResponse, value.PromptTokens, value.CompletionTokens,
+	))
 	if err != nil {
 		return fmt.Errorf("update analysis_result: %w", err)
 	}
@@ -115,7 +127,10 @@ func (r *AnalysisResultRepository) Delete(ctx context.Context, id string) error 
 
 func scanAnalysisResult(row pgx.Row) (*entites.AnalysisResult, error) {
 	var value entites.AnalysisResult
-	err := row.Scan(&value.ID, &value.JobID, &value.Summary, &value.Requirements, &value.Entities, &value.Risks, &value.RawResponse, &value.PromptTokens, &value.CompletionTokens, &value.CreatedAt)
+	err := row.Scan(
+		&value.ID, &value.JobID, &value.Summary, &value.Requirements, &value.Entities, &value.Risks,
+		&value.RawResponse, &value.PromptTokens, &value.CompletionTokens, &value.CreatedAt,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrAnalysisResultNotFound
 	}

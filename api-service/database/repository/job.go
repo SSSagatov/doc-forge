@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"cloud-native-platform/api-service/entites"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -26,9 +27,11 @@ func (r *JobRepository) Create(ctx context.Context, value *entites.Job) error {
 		return fmt.Errorf("create job: %w", err)
 	}
 	created, err := scanJob(r.pool.QueryRow(ctx, `
-INSERT INTO jobs (document_id, attempts, last_error, started_at, finished_at)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at`, value.DocumentID, value.Attempts, value.LastError, value.StartedAt, value.FinishedAt))
+		INSERT INTO jobs (document_id, attempts, last_error, started_at, finished_at)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at`,
+		value.DocumentID, value.Attempts, value.LastError, value.StartedAt, value.FinishedAt,
+	))
 	if err != nil {
 		return fmt.Errorf("create job: %w", err)
 	}
@@ -37,7 +40,11 @@ RETURNING id::text, document_id::text, attempts, last_error, started_at, finishe
 }
 
 func (r *JobRepository) GetByID(ctx context.Context, id string) (*entites.Job, error) {
-	value, err := scanJob(r.pool.QueryRow(ctx, `SELECT id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at FROM jobs WHERE id = $1::uuid`, id))
+	value, err := scanJob(r.pool.QueryRow(ctx,
+		`SELECT id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at 
+		FROM jobs WHERE id = $1::uuid`,
+		id,
+	))
 	if err != nil {
 		return nil, fmt.Errorf("get job: %w", err)
 	}
@@ -59,7 +66,9 @@ func (r *JobRepository) list(ctx context.Context, parentID *string, limit, offse
 	if limit < 1 || limit > 100 || offset < 0 {
 		return nil, errors.New("list jobs: limit must be 1..100 and offset must be non-negative")
 	}
-	query := `SELECT id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at FROM jobs`
+	query := `
+	SELECT id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at 
+	FROM jobs`
 	args := []any{limit, offset}
 	if parentID != nil {
 		query += " WHERE document_id = $3::uuid"
@@ -92,8 +101,10 @@ func (r *JobRepository) Update(ctx context.Context, value *entites.Job) error {
 		return fmt.Errorf("update job: %w", err)
 	}
 	updated, err := scanJob(r.pool.QueryRow(ctx, `
-UPDATE jobs SET document_id = $2, attempts = $3, last_error = $4, started_at = $5, finished_at = $6
-WHERE id = $1::uuid RETURNING id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at`, value.ID, value.DocumentID, value.Attempts, value.LastError, value.StartedAt, value.FinishedAt))
+		UPDATE jobs SET document_id = $2, attempts = $3, last_error = $4, started_at = $5, finished_at = $6
+		WHERE id = $1::uuid RETURNING id::text, document_id::text, attempts, last_error, started_at, finished_at, created_at`,
+		value.ID, value.DocumentID, value.Attempts, value.LastError, value.StartedAt, value.FinishedAt,
+	))
 	if err != nil {
 		return fmt.Errorf("update job: %w", err)
 	}
