@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	path := flag.String("path", "migrations", "Directory containing SQL migrations")
+	path := flag.String("path", "api-service/migrations", "Directory containing SQL migrations")
 	flag.Parse()
 	if flag.NArg() != 0 {
 		log.Fatal("unexpected arguments; use --help for usage")
