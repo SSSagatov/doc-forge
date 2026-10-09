@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"html/template"
@@ -10,13 +11,31 @@ import (
 	"path/filepath"
 	"strings"
 
+	"cloud-native-platform/api-service/entites"
 	"cloud-native-platform/api-service/templates"
+	"cloud-native-platform/api-service/usecases"
 )
 
 const maxPDFSize int64 = 10 << 20
 
+type PDFProcessor interface {
+	Execute(context.Context, *entites.Document, []byte) (*usecases.PDFAnalysis, error)
+}
+
+// NewAnalysisHandler enables persistent Gemini analysis for uploads.
+func NewAnalysisHandler(uploadDir string, processor PDFProcessor) (http.Handler, error) {
+	if processor == nil {
+		return nil, errors.New("PDF processor is required")
+	}
+	return newHandler(uploadDir, processor)
+}
+
 // NewHandler serves the upload page and saves PDFs in uploadDir.
 func NewHandler(uploadDir string) (http.Handler, error) {
+	return newHandler(uploadDir, nil)
+}
+
+func newHandler(uploadDir string, processor PDFProcessor) (http.Handler, error) {
 	page, err := template.ParseFS(templates.Files, "index.html")
 	if err != nil {
 		return nil, err
@@ -29,11 +48,11 @@ func NewHandler(uploadDir string) (http.Handler, error) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_ = page.Execute(w, nil)
 	})
-	mux.HandleFunc("POST /doc/pdf/upload", uploadPDF(uploadDir))
+	mux.HandleFunc("POST /doc/pdf/upload", uploadPDF(uploadDir, processor))
 	return mux, nil
 }
 
-func uploadPDF(uploadDir string) http.HandlerFunc {
+func uploadPDF(uploadDir string, processor PDFProcessor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Allow multipart headers in addition to the PDF itself.
 		r.Body = http.MaxBytesReader(w, r.Body, maxPDFSize+(1<<20))
@@ -87,6 +106,34 @@ func uploadPDF(uploadDir string) http.HandlerFunc {
 		if copyErr != nil || closeErr != nil {
 			_ = os.Remove(destination.Name())
 			respond(w, http.StatusInternalServerError, "Не удалось сохранить файл. Попробуйте позже.")
+			return
+		}
+		if processor != nil {
+			pdf, err := os.ReadFile(destination.Name())
+			if err != nil {
+				_ = os.Remove(destination.Name())
+				respond(w, http.StatusInternalServerError, "Не удалось прочитать сохранённый PDF.")
+				return
+			}
+			document := &entites.Document{OriginalFilename: header.Filename, StorageKey: destination.Name(), MIMEType: "application/pdf", SizeBytes: int64(len(pdf))}
+			result, err := processor.Execute(r.Context(), document, pdf)
+			if err != nil {
+				// Retain the file if a persistent job was created, including failed jobs.
+				if result == nil {
+					_ = os.Remove(destination.Name())
+				}
+				status := http.StatusInternalServerError
+				if errors.Is(err, usecases.ErrAnalysisFailed) {
+					status = http.StatusBadGateway
+				}
+				w.Header().Set("Content-Type", "application/json; charset=utf-8")
+				w.WriteHeader(status)
+				_ = json.NewEncoder(w).Encode(map[string]any{"message": "Не удалось выполнить анализ. Проверьте БД, доступность и квоту Gemini.", "data": result})
+				return
+			}
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{"message": "PDF проанализирован, результат сохранён.", "data": result})
 			return
 		}
 		respond(w, http.StatusCreated, "PDF-файл успешно загружен.")

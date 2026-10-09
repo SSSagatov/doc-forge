@@ -1,12 +1,8 @@
 package postgres
 
 import (
-	"errors"
-	"fmt"
+	"cloud-native-platform/api-service/config"
 	"os"
-	"path/filepath"
-
-	"github.com/joho/godotenv"
 )
 
 // Config contains PostgreSQL connection settings.
@@ -20,18 +16,8 @@ type Config struct {
 }
 
 func loadConfig() (Config, error) {
-	envPath, err := filepath.Abs("../../.env")
-	if err != nil {
-		return Config{}, fmt.Errorf("resolve .env path: %w", err)
-	}
-
-	if _, err := os.Stat(envPath); err != nil {
-		return Config{}, fmt.Errorf("cannot access .env at %q: %w", envPath, err)
-	}
-
-	if err := godotenv.Load(envPath); err != nil {
-		// Parsing errors may contain secrets from the file.
-		return Config{}, errors.New("failed to load .env: check that the file exists, is readable, and has valid syntax")
+	if err := config.LoadEnv(); err != nil {
+		return Config{}, err
 	}
 
 	return Config{

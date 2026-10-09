@@ -11,7 +11,12 @@ import (
 	"syscall"
 	"time"
 
+	"cloud-native-platform/api-service/config"
 	"cloud-native-platform/api-service/controllers"
+	"cloud-native-platform/api-service/database/postgres"
+	"cloud-native-platform/api-service/database/repository"
+	"cloud-native-platform/api-service/gemini"
+	"cloud-native-platform/api-service/usecases"
 )
 
 func main() {
@@ -24,7 +29,20 @@ func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	handler, err := controllers.NewHandler("uploads")
+	if err := config.LoadEnv(); err != nil {
+		return err
+	}
+	ai, err := gemini.NewFromEnv()
+	if err != nil {
+		return err
+	}
+	pool, err := postgres.Connect(ctx)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	processor := usecases.NewAnalyzePDFUseCase(repository.NewAnalysisStore(pool), ai)
+	handler, err := controllers.NewAnalysisHandler("uploads", processor)
 	if err != nil {
 		return err
 	}
@@ -32,7 +50,7 @@ func run() error {
 		Addr: "127.0.0.1:8080", Handler: handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       60 * time.Second,
-		WriteTimeout:      60 * time.Second,
+		WriteTimeout:      180 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
 	log.Println("doc-forge: http://localhost:8080")

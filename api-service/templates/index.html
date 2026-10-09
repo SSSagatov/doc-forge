@@ -50,9 +50,17 @@
           <button type="button" id="choose">Загрузить PDF файл</button>
           <p id="filename" hidden></p>
         </div>
-        <p class="note">Загрузка начнётся сразу после выбора файла.</p>
+        <p class="note">После выбора PDF отправляется в Google Gemini для анализа. Обработка может занять до двух минут.</p>
         <p id="status" role="status" aria-live="polite"></p>
       </form>
+      <section id="analysis" hidden style="text-align:left; overflow-wrap:anywhere">
+        <h2>Результат анализа</h2>
+        <p id="summary"></p>
+        <h3>Требования</h3><ul id="requirements"></ul>
+        <h3>Сущности</h3><ul id="entities"></ul>
+        <h3>Риски</h3><ul id="risks"></ul>
+        <p class="note">Ответ ИИ может содержать ошибки. Сверяйте выводы с исходным документом.</p>
+      </section>
       <noscript>Для выбора и загрузки файла включите JavaScript в браузере.</noscript>
     </section>
     <footer>doc-forge · Простое начало работы с документами</footer>
@@ -69,6 +77,7 @@
       filename.textContent = file.name;
       filename.hidden = false;
       status.className = '';
+      document.querySelector('#analysis').hidden = true;
       if (!file.name.toLowerCase().endsWith('.pdf') || file.size > 10 * 1024 * 1024) {
         status.textContent = 'Выберите PDF-файл размером до 10 МБ.';
         status.className = 'error';
@@ -77,7 +86,7 @@
       }
       button.disabled = true;
       button.textContent = 'Загружаем…';
-      status.textContent = 'Отправляем документ. Пожалуйста, подождите.';
+      status.textContent = 'Загружаем и анализируем PDF через Gemini. Пожалуйста, подождите.';
       const data = new FormData();
       data.append('file', file);
       try {
@@ -85,6 +94,20 @@
         const result = await response.json();
         status.textContent = result.message;
         status.className = response.ok ? 'success' : 'error';
+        if (response.ok && result.data?.analysis) {
+          const analysis = result.data.analysis;
+          document.querySelector('#summary').textContent = analysis.summary;
+          for (const key of ['requirements', 'entities', 'risks']) {
+            const list = document.querySelector('#' + key);
+            list.replaceChildren();
+            for (const text of analysis[key].length ? analysis[key] : ['Не обнаружено']) {
+              const item = document.createElement('li');
+              item.textContent = text;
+              list.append(item);
+            }
+          }
+          document.querySelector('#analysis').hidden = false;
+        }
       } catch {
         status.textContent = 'Не удалось связаться с сервером. Проверьте подключение и попробуйте снова.';
         status.className = 'error';
